@@ -9,44 +9,50 @@ class Family {
 public:
 	explicit Family(const YAML::Node &config);
 
+	// print family info
 	void print() const;
 
 public:
 	static GiNaC::symtab symtab;
 
 private:
+	// family name
 	std::string _name;
-	std::vector<GiNaC::ex> _internals;
-	std::vector<GiNaC::ex> _externals;
+	// dimension of the family
+	GiNaC::ex _dimension;
+	// loop momenta
+	std::vector<GiNaC::possymbol> _internals;
+	// external momenta
+	std::vector<GiNaC::possymbol> _externals;
+	// kinematics invariants
+	//  first: name
+	//  second: dimension
+	std::vector<std::pair<GiNaC::possymbol, unsigned >> _invariants;
+	// the invariant set to one
+	GiNaC::ex _one;
+	// symbols
+	std::vector<GiNaC::possymbol> _symbols;
+
+	// substitution rules
+	GiNaC::lst _sp_rules;
+	// propagators
+	std::vector<GiNaC::ex> _propagators;
 };
 
-struct Reduce {
-	// top level sector
-	unsigned top = 0;
-	// sum of positive indices
-	unsigned posi = 0;
-	// sum of negative indices
-	unsigned rank = 0;
-	// posi - lines
-	unsigned dot = 0;
+class Reduce {
+public:
+	explicit Reduce(const YAML::Node &config);
 
+	// print reduciton job info
 	void print() const;
+
+private:
+	// top level sector
+	unsigned _top = 0;
+	// sum of positive indices
+	unsigned _posi = 0;
+	// sum of negative indices
+	unsigned _rank = 0;
+	// posi - lines
+	unsigned _dot = 0;
 };
-
-
-namespace YAML {
-	template<>
-	struct convert<Reduce> {
-		static bool decode(const Node &node, Reduce &reduce) {
-			if (!node.IsMap())
-				return false;
-
-			reduce.top = node["top"].as<unsigned>();
-			reduce.posi = node["posi"].as<unsigned>();
-			reduce.rank = node["rank"].as<unsigned>();
-			reduce.dot = node["dot"].as<unsigned>();
-
-			return true;
-		}
-	};
-} // namespace YAML

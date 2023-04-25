@@ -16,11 +16,20 @@ int main(int argc, char **argv) {
 
 	CLI11_PARSE(app, argc, argv);
 
-	YAML::Node config = YAML::LoadFile(configPath);
-	InIBP inibp(config);
+	std::cout << "\n--------------- \033[34mInIBP is not IBP\033[0m ---------------" << std::endl;
+	try {
+		YAML::Node config = YAML::LoadFile(configPath);
+		InIBP inibp(config);
 
-	inibp.init();
-	inibp.run();
+		inibp.init();
+		inibp.run();
+	}
+	catch (std::runtime_error &e) {
+		std::cerr << " \033[31mError:\033[0m " << e.what()
+		          << "\n" << std::endl;
+		return EXIT_FAILURE;
+	}
 
-	return 0;
+	std::cout << std::endl;
+	return EXIT_SUCCESS;
 }
