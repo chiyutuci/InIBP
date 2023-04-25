@@ -10,15 +10,15 @@
 
 class InIBP {
 public:
-	explicit InIBP(const YAML::Node &);
+  explicit InIBP(const YAML::Node &);
 
 public:
-	// prepare family and reduction job
-	void init();
-	// run the reduction
-	void run();
+  // prepare family and reduction job
+  void init();
+  // run the reduction
+  void run();
 
 private:
-	Family _family;
-	Reduce _reduce;
+  Family _family;
+  Reduce _reduce;
 };
