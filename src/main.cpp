@@ -5,6 +5,7 @@
 
 #include "inibp.h"
 
+
 int main(int argc, char **argv) {
 	CLI::App app;
 
@@ -14,9 +15,9 @@ int main(int argc, char **argv) {
 					->required()
 					->check(CLI::ExistingFile);
 
-	CLI11_PARSE(app, argc, argv);
+	CLI11_PARSE(app, argc, argv)
 
-	std::cout << "\n--------------- \033[34mInIBP is not IBP\033[0m ---------------" << std::endl;
+	std::cout << "\n--------------- \033[35mInIBP is not IBP\033[0m ---------------" << std::endl;
 	try {
 		YAML::Node config = YAML::LoadFile(configPath);
 		InIBP inibp(config);

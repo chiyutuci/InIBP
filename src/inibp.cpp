@@ -5,6 +5,7 @@ InIBP::InIBP(const YAML::Node &node) : _family(node), _reduce(node) {
 }
 
 void InIBP::init() {
+	_family.generate_ibp();
 
 	_family.print();
 	_reduce.print();

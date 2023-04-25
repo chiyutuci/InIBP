@@ -19,13 +19,13 @@ set(INIBP_LIBRARIES arith)
 
 # add source files
 aux_source_directory(${INIBP_SRC_DIR} INIBP_SRC)
-add_executable(inibp ${INIBP_SRC})
+add_executable(inibp ${INIBP_SRC} src/equation.h src/utils.h)
 target_include_directories(inibp PUBLIC ${INIBP_SRC_DIR} ${INIBP_INCLUDE_DIR} ${INIBP_LIB_DIR})
 
 # add libraries
 foreach (LIBRARY ${INIBP_LIBRARIES})
     add_subdirectory(${INIBP_LIB_DIR}/${LIBRARY})
-endforeach()
+endforeach ()
 target_link_libraries(inibp ${INIBP_LIBRARIES})
 
 # add third party libraries
@@ -33,12 +33,12 @@ target_link_libraries(inibp ${INIBP_LIBRARIES})
 find_library(YAML_LIBRARY NAMES yaml-cpp)
 if (NOT YAML_LIBRARY)
     message(FATAL_ERROR "yaml-cpp library not found")
-endif()
+endif ()
 target_link_libraries(inibp ${YAML_LIBRARY})
 
 #ginac library
 find_library(GINAC_LIBRARY NAMES ginac)
 if (NOT GINAC_LIBRARY)
     message(FATAL_ERROR "ginac library not found")
-endif()
+endif ()
 target_link_libraries(inibp ${GINAC_LIBRARY})
