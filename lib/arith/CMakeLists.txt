@@ -1,10 +1,7 @@
-# set library directories
-set(POLY_SRC_DIR src)
-
 # set library sources
-aux_source_directory(${POLY_SRC_DIR} POLY_SRC)
-add_library(poly ${POLY_SRC})
-target_include_directories(poly PUBLIC ${POLY_SRC_DIR})
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} ARITH_SRC)
+add_library(arith ${ARITH_SRC})
+target_include_directories(arith PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # add third party libraries
 # flint library

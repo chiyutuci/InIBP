@@ -15,12 +15,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(INIBP_SRC_DIR src)
 set(INIBP_LIB_DIR lib)
 set(INIBP_INCLUDE_DIR include)
-set(INIBP_LIBRARIES poly)
+set(INIBP_LIBRARIES arith)
 
 # add source files
 aux_source_directory(${INIBP_SRC_DIR} INIBP_SRC)
 add_executable(inibp ${INIBP_SRC})
-target_include_directories(inibp PUBLIC ${INIBP_SRC_DIR} ${INIBP_INCLUDE_DIR})
+target_include_directories(inibp PUBLIC ${INIBP_SRC_DIR} ${INIBP_INCLUDE_DIR} ${INIBP_LIB_DIR})
 
 # add libraries
 foreach (LIBRARY ${INIBP_LIBRARIES})
@@ -35,3 +35,10 @@ if (NOT YAML_LIBRARY)
     message(FATAL_ERROR "yaml-cpp library not found")
 endif()
 target_link_libraries(inibp ${YAML_LIBRARY})
+
+#ginac library
+find_library(GINAC_LIBRARY NAMES ginac)
+if (NOT GINAC_LIBRARY)
+    message(FATAL_ERROR "ginac library not found")
+endif()
+target_link_libraries(inibp ${GINAC_LIBRARY})
