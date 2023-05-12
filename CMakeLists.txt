@@ -19,7 +19,7 @@ set(INIBP_LIBRARIES arith)
 
 # add source files
 aux_source_directory(${INIBP_SRC_DIR} INIBP_SRC)
-add_executable(inibp ${INIBP_SRC} src/equation.h src/utils.h)
+add_executable(inibp ${INIBP_SRC})
 target_include_directories(inibp PUBLIC ${INIBP_SRC_DIR} ${INIBP_INCLUDE_DIR} ${INIBP_LIB_DIR})
 
 # add libraries

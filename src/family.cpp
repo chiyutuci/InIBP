@@ -22,7 +22,8 @@ Family::Family(const YAML::Node &config) {
   if (familyConfig["dimension"]) {
     GiNaC::parser parser;
     _dimension = parser(familyConfig["dimension"].as<std::string>());
-  } else
+  }
+  else
     _dimension = GiNaC::possymbol("D");
   if (!is_a<GiNaC::numeric>(_dimension)) {
     _dimension = GiNaC::possymbol("D");
@@ -48,11 +49,9 @@ Family::Family(const YAML::Node &config) {
     std::string one;
     if (familyConfig["invar_one"])
       one = familyConfig["invar_one"].as<std::string>();
-    for (const auto &inv: familyConfig["invariants"]
-            .as<std::vector<std::pair<std::string, unsigned>>>()) {
+    for (const auto &inv: familyConfig["invariants"].as<std::vector<std::pair<std::string, unsigned>>>()) {
       if (symtab.contains(inv.first))
-        throw std::runtime_error("symbol " + inv.first +
-                                 " defined more than once");
+        throw std::runtime_error("symbol " + inv.first + " defined more than once");
       _invariants.emplace_back(inv.first, inv.second);
       symtab[inv.first] = _invariants.back().first;
       if (inv.first != one)
@@ -62,42 +61,54 @@ Family::Family(const YAML::Node &config) {
   // the invariant set to one
   if (familyConfig["invar_one"]) {
     auto one = familyConfig["invar_one"].as<std::string>();
-    if (!symtab.contains(one))
-      throw std::runtime_error("the invariant set to one is not valid");
-    _one = (symtab[one] == 1);
+    if (one != "null") {
+      if (!symtab.contains(one))
+        throw std::runtime_error("the invariant set to one is not valid");
+      _one.append(symtab[one] == 1);
+    }
   }
 
   GiNaC::parser reader(symtab);
 
   _nints = _internals.size();
   _nexts = _externals.size();
-  _nprops = _nints * (_nexts + (_nints + 1) / 2);
+  _nprops = _nints * _nexts + _nints * (_nints + 1) / 2;
   unsigned nsps = _nexts * (_nexts + 1) / 2;
 
   // invariant scalar products
-  if (familyConfig["sp_rules"]) {
-    if (familyConfig["sp_rules"].size() != nsps)
-      throw std::runtime_error("number of scalar product rules does not match the topology");
-    for (const auto &sp: familyConfig["sp_rules"]
-            .as<std::vector<std::vector<std::string>>>()) {
-      if (!symtab.contains(sp[0]) || !symtab.contains(sp[1]))
-        throw std::runtime_error("scalar product rules contains invalid expressions");
-      _spsRules.append(reader(sp[0]) * reader(sp[1]) == reader(sp[2]).subs(_one).expand());
-    }
+  if (familyConfig["sp_rules"].size() != nsps)
+    throw std::runtime_error("number of scalar product rules does not match the topology");
+  for (const auto &sp: familyConfig["sp_rules"].as<std::vector<std::vector<std::string>>>()) {
+    if (sp.size() != 3 || !symtab.contains(sp[0]) || !symtab.contains(sp[1]))
+      throw std::runtime_error("scalar product rules contains invalid expressions");
+    _spsRules.append(reader(sp[0]) * reader(sp[1]) == reader(sp[2]).subs(_one));
   }
+
   // propagators
   if (familyConfig["propagators"].size() != _nprops)
     throw std::runtime_error("number of propagators does not match the topology");
-  for (const auto &prop: familyConfig["propagators"]
-          .as<std::vector<std::pair<std::string, std::string>>>())
+  for (const auto &prop: familyConfig["propagators"].as<std::vector<std::pair<std::string, std::string>>>())
     _propagators.emplace_back(
             (pow(reader(prop.first), 2) - pow(reader(prop.second), 2)).subs(_one).expand()
-                    .subs(_spsRules, GiNaC::subs_options::algebraic)).expand();
+                    .subs(_spsRules, GiNaC::subs_options::algebraic).expand());
 
   _symIndices = generate_symbols("a", _nprops);
   _symProps = generate_symbols("D", _nprops);
+}
 
+void Family::init() {
+  std::cout << "\n \033[33m#0.1\033[0m   Initializing integral family...\n";
   _compute_sps();
+  _compute_symanzik();
+  std::cout << "\n \033[1m\033[32m#0.1\033[0m   Initializing integral family finished.\n";
+
+  std::cout << "\n \033[33m#0.2\033[0m   Generating IBP relations...\n";
+  _generate_ibp();
+  std::cout << "\n \033[1m\033[32m#0.2\033[0m   Generating IBP relations finished.\n";
+
+  std::cout << "\n \033[33m#0.3\033[0m   Searching trivial sectors...\n";
+  _search_trivial_sectors();
+  std::cout << "\n \033[1m\033[32m#0.3\033[0m   Searching trivial sectors finished.\n";
 }
 
 void Family::print() const {
@@ -120,15 +131,7 @@ void Family::print() const {
   std::cout << std::endl;
 }
 
-void Family::generate_ibp() {
-  std::cout << "\n \033[32m#0.1\033[0m   Generating IBP relations..." << std::endl;
-
-  _generate_ibp_detail();
-
-  std::cout << "\n \033[32m#0.1\033[0m   Generating IBP relations finished." << std::endl;
-}
-
-void Family::_generate_ibp_detail() {
+void Family::_generate_ibp() {
   GiNaC::ex coeff, coeffD;
   std::map<std::vector<int>, GiNaC::ex> equation;
 
@@ -143,8 +146,7 @@ void Family::_generate_ibp_detail() {
         equation[std::vector<int>(_nprops, 0)] += _dimension;
       for (size_t s = 0; s < _nprops; ++s) {
         if (j < _nints)
-          coeff = (-_symIndices[s]) * _internals[j]
-                  * GiNaC::diff(_propagators[s], _internals[i]);
+          coeff = (-_symIndices[s]) * _internals[j] * GiNaC::diff(_propagators[s], _internals[i]);
         else
           coeff = (-_symIndices[s]) * _externals[j - _nints] *
                   GiNaC::diff(_propagators[s], _internals[i]);
@@ -153,7 +155,7 @@ void Family::_generate_ibp_detail() {
           std::vector<int> integral(_nprops, 0);
           integral[s] = 1;
           // substitute scalar products by propagators
-          coeff = coeff.expand().subs(_spsFromProps, GiNaC::subs_options::algebraic);
+          coeff = coeff.subs(_spsFromProps, GiNaC::subs_options::algebraic);
           // t: D_t in coeff
           for (size_t t = 0; t < _nprops; ++t) {
             coeffD = coeff.diff(_symProps[t]);
@@ -163,7 +165,8 @@ void Family::_generate_ibp_detail() {
               integral[t] += 1;
             }
             coeff = coeff.subs(_symProps[t] == 0);
-            if (coeff == 0) break;
+            if (coeff == 0)
+              break;
           }
           coeff = coeff.expand();
           if (coeff != 0)
@@ -182,6 +185,8 @@ void Family::_generate_ibp_detail() {
     }
   }
 }
+
+void Family::_search_trivial_sectors() {}
 
 void Family::_compute_sps() {
   GiNaC::matrix propSpMat(_nprops, _nprops);
@@ -231,11 +236,41 @@ void Family::_compute_sps() {
       ++index;
     }
     for (unsigned j = 0; j < _nexts; ++j) {
-      _spsFromProps.append(_internals[i] * _externals[j] ==
-                           spPropVec(index, 0));
+      _spsFromProps.append(_internals[i] * _externals[j] == spPropVec(index, 0));
       ++index;
     }
   }
+}
+
+void Family::_compute_symanzik() {
+  GiNaC::ex schwinger;
+  for (unsigned i = 0; i < _nprops; ++i)
+    schwinger += -_symIndices[i] * _propagators[i];
+
+  // the constant item
+  GiNaC::lst allZero;
+  for (const auto &ex: _internals)
+    allZero.append(ex == 0);
+  GiNaC::ex J = -schwinger.subs(allZero, GiNaC::subs_options::algebraic);
+
+  // matrix l.M.l
+  GiNaC::matrix M(_nints, _nints);
+  // vector l.v
+  GiNaC::matrix V(_nints, 1);
+
+  for (unsigned i = 0; i < _nints; ++i) {
+    GiNaC::ex di = schwinger.diff(_internals[i]);
+    for (unsigned j = i; j < _nints; ++j) {
+      M(i, j) = di.diff(_internals[j]) / 2;
+      if (i != j)
+        M(j, i) = M(i, j);
+    }
+    V(i, 0) = -di.subs(allZero, GiNaC::subs_options::algebraic) / 2;
+  }
+
+  _uPoly = M.determinant().expand();
+  _fPoly = (_uPoly * J + V.transpose().mul(M.inverse().mul_scalar(_uPoly)).mul(V)(0, 0)).expand()
+          .subs(_spsRules, GiNaC::subs_options::algebraic).expand();
 }
 
 std::vector<GiNaC::possymbol> Family::generate_symbols(const std::string &name, unsigned n) {
@@ -243,6 +278,19 @@ std::vector<GiNaC::possymbol> Family::generate_symbols(const std::string &name, 
   for (size_t i = 0; i < n; ++i)
     symbols[i] = GiNaC::possymbol(name + std::to_string(i + 1));
   return symbols;
+}
+
+void Family::check_reduce(const Reduce &reduce) const {
+  unsigned maxSector = (1 << _nprops) - 1;
+
+  if (reduce._top > maxSector)
+    throw std::runtime_error("top sector exceeds the maximum " + std::to_string(maxSector));
+  if (reduce._posi < _nints)
+    process_finish("all integrals are zero, no need to reduce");
+
+  unsigned lines = std::popcount(reduce._top);
+  if (reduce._posi < lines)
+    throw std::runtime_error("the posi number should not be smaller than " + std::to_string(lines));
 }
 
 Reduce::Reduce(const YAML::Node &node) {
@@ -256,6 +304,7 @@ Reduce::Reduce(const YAML::Node &node) {
 
 void Reduce::print() const {
   std::cout << "\n----------------- \033[36mReduce Info\033[0m ------------------\n"
-            << "\n  Top: " << _top << "   Posi: " << _posi << "   Rank: " << _rank
-            << "   Dot: " << _dot << std::endl;
+            << "\n  Top: " << _top << "   Posi: " << _posi
+            << "   Rank: " << _rank << "   Dot: " << _dot
+            << std::endl;
 }

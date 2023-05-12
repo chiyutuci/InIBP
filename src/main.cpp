@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
     inibp.run();
   }
   catch (std::runtime_error &e) {
-    std::cerr << " \033[31mError:\033[0m " << e.what()
+    std::cerr << "\n \033[1m\033[31mError:\033[0m " << e.what()
               << "\n" << std::endl;
     return EXIT_FAILURE;
   }

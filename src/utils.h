@@ -5,7 +5,7 @@
 
 
 template<typename T1, typename T2>
-inline std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p);
+std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p);
 
 template<typename T>
 inline std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
@@ -23,4 +23,9 @@ template<typename T1, typename T2>
 inline std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p) {
   os << "<" << p.first << ", " << p.second << ">";
   return os;
+}
+
+inline void process_finish(const std::string &result) {
+  std::cout << "\n\033[1m\033[36m Finish: \033[0m" << result << "\n" << std::endl;
+  exit(EXIT_SUCCESS);
 }
