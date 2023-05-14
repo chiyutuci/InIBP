@@ -8,6 +8,7 @@
 #include "yaml-cpp/yaml.h"
 
 #include "utils.h"
+#include "sector.h"
 
 
 class Reduce;
@@ -22,6 +23,8 @@ public:
 
   // initialize the family
   void init();
+  // prepare reduce information
+  void init_reduce(Reduce &) const;
   // print family information
   void print() const;
 
@@ -36,7 +39,7 @@ private:
   // generate ibp relations
   void _generate_ibp();
   // search trivial sectors
-  void _search_trivial_sectors();
+  void _search_trivial_sectors(Reduce &) const;
 
 public:
   static GiNaC::symtab symtab;
@@ -109,4 +112,10 @@ private:
   unsigned _rank = 0;
   // posi - lines
   unsigned _dot = 0;
+  // non-trivial sectors
+  // true: non-trivial
+  // false: trivial or irrelevant
+  std::vector<bool> _sectors;
+  // the reduction jobs
+  std::vector<Sector> _reduceSectors;
 };

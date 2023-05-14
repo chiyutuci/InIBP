@@ -9,6 +9,7 @@ void InIBP::init() {
   std::cout << "\n \033[1m\033[32m#0.0\033[0m   Parsing config file finished." << std::endl;
 
   _family.init();
+  _family.init_reduce(_reduce);
 
   _family.print();
   _reduce.print();
