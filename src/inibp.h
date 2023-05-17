@@ -13,8 +13,6 @@ public:
   explicit InIBP(const YAML::Node &);
 
 public:
-  // prepare family and reduction job
-  void init();
   // run the reduction
   void run();
 

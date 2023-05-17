@@ -11,20 +11,14 @@
 #include "sector.h"
 
 
-class Reduce;
-
-
 class Family {
 public:
-  explicit Family(const YAML::Node &config);
-
-  // check if the reduction job is valid
-  void check_reduce(const Reduce &) const;
+  explicit Family(const YAML::Node &);
 
   // initialize the family
   void init();
   // prepare reduce information
-  void init_reduce(Reduce &) const;
+  void init_reduce(const YAML::Node &, Reduce &) const;
   // print family information
   void print() const;
 
@@ -88,30 +82,27 @@ private:
   typedef std::vector<std::pair<std::vector<int>, GiNaC::ex>> IBPProto;
   // ibp relations prototype
   std::vector<IBPProto> _ibp;
-
 };
-
 
 class Reduce {
 public:
-  explicit Reduce(const YAML::Node &config);
+  // prepare sectors relations
+  void prepare_sectors();
 
   // print reduciton job info
   void print() const;
 
-
   friend class Family;
 
-
 private:
-  // top level sector
+  // raw target integrals
+  std::vector<std::vector<int>> _rawTargets;
+  // top sector
   unsigned _top = 0;
-  // sum of positive indices
-  unsigned _posi = 0;
-  // sum of negative indices
-  unsigned _rank = 0;
-  // posi - lines
-  unsigned _dot = 0;
+  // number of propagators
+  unsigned _nprops = 0;
+  // top sector lines
+  std::vector<bool> _lines;
   // non-trivial sectors
   // true: non-trivial
   // false: trivial or irrelevant

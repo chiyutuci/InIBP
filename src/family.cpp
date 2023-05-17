@@ -3,7 +3,10 @@
 GiNaC::symtab Family::symtab;
 
 Family::Family(const YAML::Node &config) {
+  if (!config["family"])
+    throw std::runtime_error("family not found");
   YAML::Node familyConfig = config["family"];
+
   // check config file keys
   if (!familyConfig["name"])
     throw std::runtime_error("family name not found");
@@ -45,9 +48,9 @@ Family::Family(const YAML::Node &config) {
     symtab[sym] = _externals.back();
   }
   // invariants
-  if (familyConfig["invariants"]) {
+  if (familyConfig["invariants"] && !familyConfig["invariants"].IsNull()) {
     std::string one;
-    if (familyConfig["invar_one"])
+    if (familyConfig["invar_one"] && !familyConfig["invar_one"].IsNull())
       one = familyConfig["invar_one"].as<std::string>();
     for (const auto &inv: familyConfig["invariants"].as<std::vector<std::pair<std::string, unsigned>>>()) {
       if (symtab.contains(inv.first))
@@ -59,13 +62,11 @@ Family::Family(const YAML::Node &config) {
     }
   }
   // the invariant set to one
-  if (familyConfig["invar_one"]) {
+  if (familyConfig["invar_one"] && !familyConfig["invar_one"].IsNull()) {
     auto one = familyConfig["invar_one"].as<std::string>();
-    if (one != "null") {
-      if (!symtab.contains(one))
-        throw std::runtime_error("the invariant set to one is not valid");
-      _one.append(symtab[one] == 1);
-    }
+    if (!symtab.contains(one))
+      throw std::runtime_error("the invariant set to one is not valid");
+    _one.append(symtab[one] == 1);
   }
 
   GiNaC::parser reader(symtab);
@@ -92,6 +93,8 @@ Family::Family(const YAML::Node &config) {
             (pow(reader(prop.first), 2) - pow(reader(prop.second), 2)).expand()
                     .subs(_spsRules, GiNaC::subs_options::algebraic).subs(_one).expand());
 
+  std::cout << "\n \033[1m\033[32m#0.0\033[0m   Parsing config file finished." << std::endl;
+
   _symIndices = generate_symbols("a", _nprops);
   _symProps = generate_symbols("D", _nprops);
 }
@@ -107,36 +110,36 @@ void Family::init() {
   std::cout << "\n \033[1m\033[32m#0.2\033[0m   Generating IBP relations finished.\n";
 }
 
-void Family::init_reduce(Reduce &reduce) const {
-  std::cout << "\n \033[33m#0.3\033[0m   Searching trivial sectors...\n";
+void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
+  std::cout << "\n \033[33m#0.3\033[0m   Collecting target integrals...\n";
+  if (!config["targets"])
+    throw std::runtime_error("reduce targets not found");
+  reduce._rawTargets = config["targets"].as<std::vector<std::vector<int>>>();
+
+  // find the top sector
+  reduce._nprops = _nprops;
+  std::vector<bool> hasLine(_nprops, false);
+  for (const auto &integral: reduce._rawTargets) {
+    if (integral.size() != _nprops) {
+      std::stringstream ss;
+      ss << integral;
+      throw std::runtime_error("target integral " + ss.str() + " is invalid");
+    }
+    for (unsigned i = 0; i < _nprops; ++i) {
+      if (integral[i] > 0 && !hasLine[i])
+        hasLine[i] = true;
+    }
+  }
+  for (unsigned i = 0; i < _nprops; ++i)
+    if (hasLine[i])
+      reduce._top |= 1 << i;
+  std::cout << "\n \033[1m\033[32m#0.3\033[0m   Collecting target integrals finished.\n";
+
+  std::cout << "\n \033[33m#0.4\033[0m   Searching trivial sectors...\n";
   _search_trivial_sectors(reduce);
-  std::cout << "\n \033[1m\033[32m#0.3\033[0m   Searching trivial sectors finished.\n";
+  std::cout << "\n \033[1m\033[32m#0.4\033[0m   Searching trivial sectors finished.\n";
 
-  // prepare sectors
-  unsigned nsec = std::count_if(reduce._sectors.begin(), reduce._sectors.end(), [](bool value) {
-    return value;
-  });
-  std::vector<unsigned> sectors(nsec);
-  for (unsigned i = 0, j = nsec - 1; i < reduce._sectors.size(); ++i)
-    if (reduce._sectors[i])
-      sectors[j--] = i;
-  std::cout << sectors << std::endl;
-  std::sort(sectors.begin(), sectors.end(), [](unsigned a, unsigned b) {
-    unsigned aline = std::popcount(a);
-    unsigned bline = std::popcount(b);
-    if (aline > bline)
-      return true;
-    else if (aline == bline)
-      return a > b;
-    else
-      return false;
-  });
-
-  reduce._reduceSectors = std::vector<Sector>(nsec);
-  for (unsigned i = 0; i < sectors.size(); ++i)
-    reduce._reduceSectors[i].id() = sectors[i];
-
-  std::cout << sectors << std::endl;
+  reduce.prepare_sectors();
 }
 
 void Family::print() const {
@@ -227,6 +230,7 @@ void Family::_search_trivial_sectors(Reduce &reduce) const {
     gDiff += kvec[i] * _symIndices[i] * gPoly.diff(_symIndices[i]);
   gDiff = (gDiff - gPoly).expand();
 
+  reduce._sectors = std::vector<bool>(reduce._top + 1, false);
   std::vector<unsigned> trivials;
   for (unsigned sector = reduce._top; sector >= (1 << _nints) - 1; --sector) {
     // check if this sector belongs to top sector
@@ -369,35 +373,9 @@ std::vector<GiNaC::possymbol> Family::generate_symbols(const std::string &name, 
   return symbols;
 }
 
-void Family::check_reduce(const Reduce &reduce) const {
-  unsigned maxSector = (1 << _nprops) - 1;
-
-  if (reduce._top > maxSector)
-    throw std::runtime_error("top sector exceeds the maximum " + std::to_string(maxSector));
-  if (reduce._posi < _nints)
-    process_finish("all integrals are zero, no need to reduce");
-
-  unsigned lines = std::popcount(reduce._top);
-  if (reduce._posi < lines + 1)
-    throw std::runtime_error("the posi number should not be smaller than "
-                             + std::to_string(lines + 1));
-}
-
-Reduce::Reduce(const YAML::Node &node) {
-  YAML::Node reduceConfig = node["reduce"];
-
-  _top = reduceConfig["top"].as<unsigned>();
-  _posi = reduceConfig["posi"].as<unsigned>();
-  _rank = reduceConfig["rank"].as<unsigned>();
-  _dot = reduceConfig["dot"].as<unsigned>();
-
-  _sectors = std::vector<bool>(_top + 1, false);
-}
-
 void Reduce::print() const {
   std::cout << "\n----------------- \033[36mReduce Info\033[0m ------------------\n"
-            << "\n  Top: " << _top << "   Posi: " << _posi
-            << "   Rank: " << _rank << "   Dot: " << _dot;
+            << "\n  Targets: " << _rawTargets.size() << "   Top sector: " << _top;
 
   std::cout << "\n\n  Non-trivial sectors: "
             << std::count_if(_sectors.begin(), _sectors.end(), [](bool value) {
@@ -405,4 +383,42 @@ void Reduce::print() const {
             });
 
   std::cout << std::endl;
+}
+
+void Reduce::prepare_sectors() {
+  _lines = std::vector<bool>(_nprops, false);
+  for (unsigned i = 0; i < _nprops; ++i)
+    if (_top & (1 << i))
+      _lines[i] = true;
+
+  // sort non-trivial sectors
+  unsigned nsec = std::count_if(_sectors.begin(), _sectors.end(), [](bool value) {
+    return value;
+  });
+  std::vector<unsigned> sectors(nsec);
+  for (unsigned i = 0, j = nsec - 1; i < _sectors.size(); ++i)
+    if (_sectors[i])
+      sectors[j--] = i;
+  std::sort(sectors.begin(), sectors.end(), [](unsigned a, unsigned b) {
+    unsigned alines = std::popcount(a);
+    unsigned blines = std::popcount(b);
+    if (alines > blines)
+      return true;
+    else if (alines == blines)
+      return a > b;
+    else
+      return false;
+  });
+
+  // fill the reduce sectors
+  _reduceSectors = std::vector<Sector>(nsec);
+  for (unsigned i = 0; i < sectors.size(); ++i) {
+    _reduceSectors[i]._id = sectors[i];
+    for (unsigned j = 0; j < _nprops; ++j)
+      if ((sectors[i] & (1 << j)) == 0 && _lines[j])
+        _reduceSectors[i]._superSectors.push_back(sectors[i] | (1 << j));
+    for (unsigned j = 0; j < _nprops; ++j)
+      if (sectors[i] & (1 << j) && _sectors[sectors[i] ^ (1 << j)])
+        _reduceSectors[i]._subSectors.push_back(sectors[i] ^ (1 << j));
+  }
 }

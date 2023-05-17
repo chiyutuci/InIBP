@@ -21,8 +21,7 @@ int main(int argc, char **argv) {
   try {
     YAML::Node config = YAML::LoadFile(configPath);
     InIBP inibp(config);
-
-    inibp.init();
+    
     inibp.run();
   }
   catch (std::runtime_error &e) {
