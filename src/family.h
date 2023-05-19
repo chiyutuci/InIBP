@@ -79,7 +79,7 @@ private:
   // ibp relation
   // first:  integral indices
   // second: coefficient
-  typedef std::vector<std::pair<std::vector<int>, GiNaC::ex>> IBPProto;
+  typedef std::vector<std::pair<RawIntegral, GiNaC::ex>> IBPProto;
   // ibp relations prototype
   std::vector<IBPProto> _ibp;
 };
@@ -96,7 +96,7 @@ public:
 
 private:
   // raw target integrals
-  std::vector<std::vector<int>> _rawTargets;
+  std::vector<RawIntegral> _rawTargets;
   // top sector
   unsigned _top = 0;
   // number of propagators

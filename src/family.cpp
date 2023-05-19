@@ -114,7 +114,7 @@ void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
   std::cout << "\n \033[33m#0.3\033[0m   Collecting target integrals...\n";
   if (!config["targets"])
     throw std::runtime_error("reduce targets not found");
-  reduce._rawTargets = config["targets"].as<std::vector<std::vector<int>>>();
+  reduce._rawTargets = config["targets"].as<std::vector<RawIntegral>>();
 
   // find the top sector
   reduce._nprops = _nprops;
@@ -164,7 +164,7 @@ void Family::print() const {
 
 void Family::_generate_ibp() {
   GiNaC::ex coeff, coeffD;
-  std::map<std::vector<int>, GiNaC::ex> equation;
+  std::map<RawIntegral, GiNaC::ex> equation;
 
   // i: l_i in derivatives
   // j: l_j or p_j in nominators
@@ -174,7 +174,7 @@ void Family::_generate_ibp() {
       equation.clear();
       // cases of i == j generate g^u_u = D
       if (i == j)
-        equation[std::vector<int>(_nprops, 0)] += _dimension;
+        equation[RawIntegral(_nprops, 0)] += _dimension;
       for (size_t s = 0; s < _nprops; ++s) {
         if (j < _nints)
           coeff = (-_symIndices[s]) * _internals[j] * GiNaC::diff(_propagators[s], _internals[i]);
@@ -183,7 +183,7 @@ void Family::_generate_ibp() {
                   GiNaC::diff(_propagators[s], _internals[i]);
         coeff = coeff.expand().subs(_spsRules, GiNaC::subs_options::algebraic).expand();
         if (coeff != 0) {
-          std::vector<int> integral(_nprops, 0);
+          RawIntegral integral(_nprops, 0);
           integral[s] = 1;
           // substitute scalar products by propagators
           coeff = coeff.subs(_spsFromProps, GiNaC::subs_options::algebraic);
@@ -391,10 +391,12 @@ void Reduce::prepare_sectors() {
     if (_top & (1 << i))
       _lines[i] = true;
 
-  // sort non-trivial sectors
   unsigned nsec = std::count_if(_sectors.begin(), _sectors.end(), [](bool value) {
     return value;
   });
+  if (nsec == 0)
+    process_finish("no non-trivial sectors");
+  // sort non-trivial sectors
   std::vector<unsigned> sectors(nsec);
   for (unsigned i = 0, j = nsec - 1; i < _sectors.size(); ++i)
     if (_sectors[i])
@@ -421,4 +423,16 @@ void Reduce::prepare_sectors() {
       if (sectors[i] & (1 << j) && _sectors[sectors[i] ^ (1 << j)])
         _reduceSectors[i]._subSectors.push_back(sectors[i] ^ (1 << j));
   }
+
+  // prepare the top sector
+  _reduceSectors[0]._depth = std::popcount(_top) + 1;
+  _reduceSectors[0]._rank = 1;
+  for (const auto &integral: _rawTargets) {
+    _reduceSectors[0]._depth = std::max(_reduceSectors[0]._depth, integral.depth());
+    _reduceSectors[0]._rank = std::max(_reduceSectors[0]._rank, integral.rank() + 1);
+  }
+
+  std::cout << "\n  Top sector: " << _reduceSectors[0]._id << "   Depth: "
+            << _reduceSectors[0]._depth
+            << "   Rank: " << _reduceSectors[0]._rank << std::endl;
 }
