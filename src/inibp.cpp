@@ -8,4 +8,6 @@ InIBP::InIBP(const YAML::Node &node) : _family(node) {
   _reduce.print();
 }
 
-void InIBP::run() {}
+void InIBP::run() {
+  _family.run_reduce(_reduce);
+}

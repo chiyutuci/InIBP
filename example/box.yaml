@@ -1,0 +1,28 @@
+family:
+  name: box
+  dimension: D
+  internals: [ l1 ]
+  externals: [ p1, p2, p3 ]
+  invariants:
+    - [ s, 2 ]
+    - [ t, 2 ]
+    - [ m, 1 ]
+  invar_one: m
+  sps_rules:
+    - [ p1, p1, m^2 ]
+    - [ p2, p2, m^2 ]
+    - [ p3, p3, m^2 ]
+    - [ p1, p2, s/2-m^2 ]
+    - [ p1, p3, t/2-m^2 ]
+    - [ p2, p3, -s/2-t/2+m^2 ]
+  propagators:
+    - [ l1, m ]
+    - [ l1+p1, 0 ]
+    - [ l1+p1+p2, m ]
+    - [ l1+p1+p2+p3, 0 ]
+
+targets:
+  - [ 2, 1, 1, 1 ]
+  - [ 1, 2, 1, 1 ]
+  - [ 1, 1, 2, 1 ]
+  - [ 1, 1, 1, 2 ]

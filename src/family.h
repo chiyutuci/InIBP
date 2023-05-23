@@ -22,7 +22,10 @@ public:
   // print family information
   void print() const;
 
-  static std::vector<GiNaC::possymbol> generate_symbols(const std::string &, unsigned);
+  // run the reduction
+  void run_reduce(Reduce &) const;
+
+  static std::vector<GiNaC::symbol> generate_symbols(const std::string &, unsigned);
 
 private:
   // compute expressions of scalar products over propagators
@@ -69,17 +72,13 @@ private:
   unsigned _nprops = 0;
 
   // symbols for integral indices
-  std::vector<GiNaC::possymbol> _symIndices;
+  std::vector<GiNaC::symbol> _symIndices;
   // symbols for integral propagators
-  std::vector<GiNaC::possymbol> _symProps;
+  std::vector<GiNaC::symbol> _symProps;
   // symanzik U
   GiNaC::ex _uPoly;
   // symanzik F
   GiNaC::ex _fPoly;
-  // ibp relation
-  // first:  integral indices
-  // second: coefficient
-  typedef std::vector<std::pair<RawIntegral, GiNaC::ex>> IBPProto;
   // ibp relations prototype
   std::vector<IBPProto> _ibp;
 };

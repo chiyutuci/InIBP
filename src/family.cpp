@@ -142,6 +142,10 @@ void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
   reduce.prepare_sectors();
 }
 
+void Family::run_reduce(Reduce &reduce) const {
+  reduce._reduceSectors[0].run_reduce(_ibp, _symIndices);
+}
+
 void Family::print() const {
   std::cout << "\n----------------- \033[36mFamily Info\033[0m ------------------\n"
             << "\n  Topology: " << _name << "   Dimension: " << _dimension
@@ -221,7 +225,7 @@ void Family::_search_trivial_sectors(Reduce &reduce) const {
   GiNaC::ex gPoly = _uPoly + _fPoly;
   GiNaC::ex gDiff;
 
-  std::vector<GiNaC::possymbol> kvec = generate_symbols("k", _nprops);
+  std::vector<GiNaC::symbol> kvec = generate_symbols("k", _nprops);
   GiNaC::lst klst;
   for (const auto &sym: kvec)
     klst.append(sym);
@@ -366,10 +370,10 @@ void Family::_compute_symanzik() {
           .subs(_spsRules, GiNaC::subs_options::algebraic).expand();
 }
 
-std::vector<GiNaC::possymbol> Family::generate_symbols(const std::string &name, unsigned n) {
-  std::vector<GiNaC::possymbol> symbols(n);
+std::vector<GiNaC::symbol> Family::generate_symbols(const std::string &name, unsigned n) {
+  std::vector<GiNaC::symbol> symbols(n);
   for (size_t i = 0; i < n; ++i)
-    symbols[i] = GiNaC::possymbol(name + std::to_string(i + 1));
+    symbols[i] = GiNaC::symbol(name + std::to_string(i + 1));
   return symbols;
 }
 
@@ -416,12 +420,16 @@ void Reduce::prepare_sectors() {
   _reduceSectors = std::vector<Sector>(nsec);
   for (unsigned i = 0; i < sectors.size(); ++i) {
     _reduceSectors[i]._id = sectors[i];
-    for (unsigned j = 0; j < _nprops; ++j)
-      if ((sectors[i] & (1 << j)) == 0 && _lines[j])
-        _reduceSectors[i]._superSectors.push_back(sectors[i] | (1 << j));
-    for (unsigned j = 0; j < _nprops; ++j)
+    _reduceSectors[i]._nprops = _nprops;
+    _reduceSectors[i]._lines = std::vector<bool>(_nprops, false);
+    for (unsigned j = 0; j < _nprops; ++j) {
+      if (sectors[i] & (1 << j))
+        _reduceSectors[i]._lines[j] = true;
       if (sectors[i] & (1 << j) && _sectors[sectors[i] ^ (1 << j)])
         _reduceSectors[i]._subSectors.push_back(sectors[i] ^ (1 << j));
+      if ((sectors[i] & (1 << j)) == 0 && _lines[j])
+        _reduceSectors[i]._superSectors.push_back(sectors[i] | (1 << j));
+    }
   }
 
   // prepare the top sector
@@ -431,8 +439,5 @@ void Reduce::prepare_sectors() {
     _reduceSectors[0]._depth = std::max(_reduceSectors[0]._depth, integral.depth());
     _reduceSectors[0]._rank = std::max(_reduceSectors[0]._rank, integral.rank() + 1);
   }
-
-  std::cout << "\n  Top sector: " << _reduceSectors[0]._id << "   Depth: "
-            << _reduceSectors[0]._depth
-            << "   Rank: " << _reduceSectors[0]._rank << std::endl;
+  _reduceSectors[0].prepare_targets(_rawTargets);
 }
