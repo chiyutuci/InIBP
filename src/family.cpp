@@ -29,8 +29,8 @@ Family::Family(const YAML::Node &config) {
   else
     _dimension = GiNaC::possymbol("D");
   if (!is_a<GiNaC::numeric>(_dimension)) {
-    _dimension = GiNaC::possymbol("D");
     _symbols.emplace_back("D");
+    _dimension = _symbols.back();
     symtab["D"] = _dimension;
   }
   // loop momenta
@@ -58,7 +58,7 @@ Family::Family(const YAML::Node &config) {
       _invariants.emplace_back(inv.first, inv.second);
       symtab[inv.first] = _invariants.back().first;
       if (inv.first != one)
-        _symbols.emplace_back(inv.first);
+        _symbols.emplace_back(_invariants.back().first);
     }
   }
   // the invariant set to one
@@ -143,7 +143,7 @@ void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
 }
 
 void Family::run_reduce(Reduce &reduce) const {
-  reduce._reduceSectors[0].run_reduce(_ibp, _symIndices);
+  reduce._reduceSectors[0].run_reduce(_ibpFF);
 }
 
 void Family::print() const {
@@ -218,6 +218,124 @@ void Family::_generate_ibp() {
       if (!ibp.empty())
         _ibp.push_back(std::move(ibp));
     }
+  }
+  _generate_li();
+  _generate_ibp_ff();
+}
+
+void Family::_generate_li() {
+  GiNaC::ex coeff1, coeff2, coeff, coeffD;
+  std::map<RawIntegral, GiNaC::ex> equation;
+
+  // (u, v): E(E-1)/2 equations
+  for (unsigned r = 0; r < _nexts; ++r) {
+    for (unsigned s = r + 1; s < _nexts; ++s) {
+      equation.clear();
+      // i: p_i
+      // p: propators
+      for (unsigned i = 0; i < _nexts; ++i) {
+        for (unsigned p = 0; p < _nprops; ++p) {
+          coeff1 = (2 * _propagators[p].diff(_externals[i]) * (-_symIndices[p]) * _externals[r])
+                  .expand().subs(_spsRules, GiNaC::subs_options::algebraic).expand();
+          coeff2 = (_externals[i] * _externals[s]).subs(_spsRules, GiNaC::subs_options::algebraic)
+                  .expand();
+          if (coeff1 != 0 && coeff2 != 0) {
+            RawIntegral integral(_nprops, 0);
+            integral[p] = 1;
+            // substitute scalar products by propagators
+            coeff = (coeff1 * coeff2).expand().subs(_spsFromProps, GiNaC::subs_options::algebraic);
+            // t: D_t in coeff
+            for (size_t t = 0; t < _nprops; ++t) {
+              coeffD = coeff.diff(_symProps[t]);
+              if (coeffD != 0) {
+                integral[t] -= 1;
+                equation[integral] += coeffD;
+                integral[t] += 1;
+              }
+              coeff = coeff.subs(_symProps[t] == 0);
+              if (coeff == 0)
+                break;
+            }
+            coeff = coeff.expand();
+            if (coeff != 0)
+              equation[integral] += coeff;
+          }
+
+          coeff1 = (-2 * _propagators[p].diff(_externals[i]) * (-_symIndices[p]) * _externals[s])
+                  .expand().subs(_spsRules, GiNaC::subs_options::algebraic).expand();
+          coeff2 = (_externals[i] * _externals[r]).subs(_spsRules, GiNaC::subs_options::algebraic)
+                  .expand();
+          if (coeff1 != 0 && coeff2 != 0) {
+            RawIntegral integral(_nprops, 0);
+            integral[p] = 1;
+            // substitute scalar products by propagators
+            coeff = (coeff1 * coeff2).expand().subs(_spsFromProps, GiNaC::subs_options::algebraic);
+            // t: D_t in coeff
+            for (size_t t = 0; t < _nprops; ++t) {
+              coeffD = coeff.diff(_symProps[t]);
+              if (coeffD != 0) {
+                integral[t] -= 1;
+                equation[integral] += coeffD;
+                integral[t] += 1;
+              }
+              coeff = coeff.subs(_symProps[t] == 0);
+              if (coeff == 0)
+                break;
+            }
+            coeff = coeff.expand();
+            if (coeff != 0)
+              equation[integral] += coeff;
+          }
+        }
+      }
+      // add to _ibp
+      IBPProto ibp;
+      for (const auto &item: equation | std::ranges::views::reverse) {
+        coeff1 = item.second.expand();
+        if (coeff1 != 0)
+          ibp.emplace_back(item.first, coeff1);
+      }
+      if (!ibp.empty())
+        _ibp.push_back(std::move(ibp));
+    }
+  }
+}
+
+void Family::_generate_ibp_ff() {
+  // choose random primes for symbols
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<unsigned> dis(0, 15);
+  std::set<unsigned> used;
+  while (used.size() < _symbols.size()) {
+    unsigned prime = dis(gen);
+    used.insert(prime);
+  }
+
+  GiNaC::lst values;
+  auto it = used.cbegin();
+  for (unsigned i = 0; i < _symbols.size(); ++i, ++it)
+    values.append(_symbols[i] == PRIMES64[*it]);
+
+  // convert to numeric equations
+  for (const auto &ibp: _ibp) {
+    IBPProtoFF ibpFF;
+    for (const auto &term: ibp) {
+      GiNaC::ex item = term.second.subs(values).expand();
+      std::vector<umod64> coeffs;
+      for (unsigned i = 0; i < _nprops; ++i) {
+        std::stringstream ss;
+        ss << item.coeff(_symIndices[i]);
+        coeffs.push_back(umod64::from(ss.str()));
+        item -= item.coeff(_symIndices[i]) * _symIndices[i];
+      }
+      // constant term
+      std::stringstream ss;
+      ss << item;
+      coeffs.push_back(umod64::from(ss.str()));
+      ibpFF.emplace_back(term.first, std::move(coeffs));
+    }
+    _ibpFF.emplace_back(std::move(ibpFF));
   }
 }
 
@@ -436,7 +554,7 @@ void Reduce::prepare_sectors() {
   _reduceSectors[0]._depth = std::popcount(_top) + 1;
   _reduceSectors[0]._rank = 1;
   for (const auto &integral: _rawTargets) {
-    _reduceSectors[0]._depth = std::max(_reduceSectors[0]._depth, integral.depth());
+    _reduceSectors[0]._depth = std::max(_reduceSectors[0]._depth, integral.depth() + 1);
     _reduceSectors[0]._rank = std::max(_reduceSectors[0]._rank, integral.rank() + 1);
   }
   _reduceSectors[0].prepare_targets(_rawTargets);

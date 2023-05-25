@@ -2,8 +2,6 @@
 family:
   # family name
   name: fam2
-  # family dimension
-  dimension: 399/400
   # loop momenta
   internals: [ l1, l2, l3 ]
   # external momenta
@@ -40,4 +38,4 @@ family:
 
 
 targets:
-  - [ 1, 1, 1, 0, 0, 3, 1, 1, 2, 0, 0, -2 ]
+  - [ 1, 1, 1, 2, -2, -2, 1, 2, 2, -2, 0, 0 ]

@@ -74,95 +74,104 @@ void Sector::prepare_targets(const std::vector<RawIntegral> &targets) {
   _usedTargets = _targets;
 }
 
-void Sector::run_reduce(const std::vector<IBPProto> &ibps,
-                        const std::vector<GiNaC::symbol> &symbols) {
+void Sector::run_reduce(const std::vector<IBPProtoFF> &ibps) {
   // generate equations for each aux-target
   while (!_auxTargets.empty())
-    _generate_equation(_auxTargets.front(), ibps, symbols);
+    _generate_equation(_auxTargets.front(), ibps);
 
   // find the master integrals
-  std::cout << "\n number of master integrals: "
-            << _usedTargets.size() - _system.size() << std::endl;
+  unsigned nmis = 0;
+  std::cout << "\n\n master integrals:\n" << std::endl;
+  for (unsigned integral = 0; integral <= *_targets.begin(); ++integral)
+    if (!_lineNumber.contains(integral)) {
+      std::cout << "   " << _seeds[integral] << std::endl;
+      ++nmis;
+    }
+  std::cout << "number of master integrals: " << nmis << std::endl;
+
+  unsigned neqs = 0;
+  for (const auto &item: _lineNumber) {
+    if (item.first > *_targets.begin())
+      ++neqs;
+  }
+  std::cout << "\n number of equations: " << _systemFF.size() << std::endl;
+  std::cout << " out bound: " << neqs << std::endl;
+
 }
 
-void Sector::_generate_equation(unsigned int target, const std::vector<IBPProto> &ibps,
-                                const std::vector<GiNaC::symbol> &symbols) {
+void Sector::_generate_equation(unsigned int target, const std::vector<IBPProtoFF> &ibps) {
   RawIntegral integral(_seeds[target]);
-  std::cout << "\n target: " << integral << std::endl;
 
   for (unsigned i = 0; i < ibps.size(); ++i) {
     for (const auto &item: ibps[i]) {
       // check if the seed is in this sector
       RawIntegral seed = integral - item.first;
-      if (seed.sector() != _id)
+      if (seed.sector() != _id || !_weights.contains(seed))
         continue;
       // check if this ibp equation has been used
       // if not used, mark it as used
       if (_usedIBP.contains({_weights[seed], i + 1}))
         continue;
-      else
-        _usedIBP.insert({_weights[seed], i + 1});
 
-      // get the value of indices
-      GiNaC::lst values;
-      for (unsigned p = 0; p < _nprops; ++p)
-        values.append(symbols[p] == seed[p]);
       // check if this item is non-zero
-      if (item.second.subs(values).expand() == 0)
+      umod64 coe = item.second.back();
+      for (unsigned k = 0; k < _nprops; ++k)
+        if (item.second[k] != 0)
+          coe += item.second[k] * umod64::from(seed[k]);
+      if (coe == 0)
         continue;
+
       // compute the equation
-      std::map<unsigned, GiNaC::ex, std::greater<>> equation;
+      EquationFF equation;
       bool allInSeeds = true;
       for (const auto &it: ibps[i]) {
-        GiNaC::ex coeff = it.second.subs(values).expand();
         RawIntegral integ = seed + it.first;
+        // check if the integral belongs to subsectors
+        if (integ.sector() != _id)
+          continue;
+        umod64 coeff = it.second.back();
+        for (unsigned k = 0; k < _nprops; ++k)
+          if (it.second[k] != 0)
+            coeff += it.second[k] * umod64::from(seed[k]);
         if (coeff != 0) {
-          // check if the integral belongs to subsectors
-          if (integ.sector() != _id)
-            continue;
           // check if the integral belongs to _seeds
-          if (_weights.contains(integ))
-            equation.insert({_weights[integ], coeff});
+          if (_weights.contains(integ)) {
+            equation.insert(_weights[integ], coeff);
+          }
           else {
             allInSeeds = false;
             break;
           }
         }
       }
-      if (!allInSeeds || equation.empty())
+      if (!allInSeeds || equation.empty()) {
+        _usedIBP.insert({_weights[seed], i + 1});
         continue;
+      }
 
       // guass elimination
-      while (!equation.empty() && _lineNumber.contains(equation.begin()->first)) {
-        unsigned pivot = equation.begin()->first;
-        GiNaC::ex scale = equation.begin()->second;
-        for (const auto &term: _system[_lineNumber[pivot]])
-          equation[term.first] -= scale * term.second;
-        std::erase_if(equation, [](const auto &term) { return term.second.expand() == 0; });
+      while (!equation.empty() && _lineNumber.contains(equation.first_integral())) {
+        equation.eliminate(_systemFF[_lineNumber[equation.first_integral()]]);
       }
-      if (equation.empty())
+      if (equation.empty()) {
+        _usedIBP.insert({_weights[seed], i + 1});
         continue;
+      }
 
-      GiNaC::ex scale = equation.begin()->second;
-      for (auto &term: equation)
-        term.second /= scale;
+      equation.normalize();
 
       // record auxiliary targets
-      for (const auto &term: equation)
+      for (const auto &term: equation.eq())
         if (!_usedTargets.contains(term.first)) {
           _auxTargets.push(term.first);
           _usedTargets.insert(term.first);
         }
 
-      std::cout << "  seed: " << seed << ", ibp: " << i + 1 << std::endl << "    ";
-      for (const auto &term: equation)
-        std::cout << term.second << " " << _seeds[term.first] << ", ";
-      std::cout << std::endl;
-
       // add the equation to the system
-      _lineNumber[equation.begin()->first] = _system.size();
-      _system.emplace_back(std::move(equation));
-      goto NextTarget;
+      _lineNumber[equation.first_integral()] = _systemFF.size();
+      _systemFF.emplace_back(std::move(equation));
+      _usedIBP.insert({_weights[seed], i + 1});
+      // goto NextTarget;
     }
   }
   NextTarget:

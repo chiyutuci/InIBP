@@ -2,6 +2,7 @@
 
 #include <string>
 #include <ranges>
+#include <random>
 #include <iostream>
 
 #include "ginac/ginac.h"
@@ -35,6 +36,10 @@ private:
 
   // generate ibp relations
   void _generate_ibp();
+  // generate li relations
+  void _generate_li();
+  // generate ibp over finite filed
+  void _generate_ibp_ff();
   // search trivial sectors
   void _search_trivial_sectors(Reduce &) const;
 
@@ -81,6 +86,8 @@ private:
   GiNaC::ex _fPoly;
   // ibp relations prototype
   std::vector<IBPProto> _ibp;
+  // ibp relations prototype over finite field
+  std::vector<IBPProtoFF> _ibpFF;
 };
 
 class Reduce {

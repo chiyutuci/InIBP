@@ -8,8 +8,10 @@
 
 #include "yaml-cpp/yaml.h"
 #include "ginac/ginac.h"
+#include "arith/umod.h"
 
 #include "utils.h"
+#include "equation.h"
 
 class Reduce;
 
@@ -60,12 +62,12 @@ public:
     return sector;
   }
 
-  bool operator==(const RawIntegral &other) {
+  bool operator==(const RawIntegral &other) const {
     return other.indices == indices;
   }
 
-  friend bool operator==(const RawIntegral &lhs, const RawIntegral &rhs) {
-    return lhs.indices == rhs.indices;
+  bool operator!=(const RawIntegral &other) const {
+    return indices < other.indices;
   }
 
   friend bool operator<(const RawIntegral &lhs, const RawIntegral &rhs) {
@@ -125,6 +127,10 @@ namespace YAML {
 // first:  integral indices
 // second: coefficient
 typedef std::vector<std::pair<RawIntegral, GiNaC::ex>> IBPProto;
+// ibp relation over finite field
+// first:  integral indices
+// second: coefficients of indices
+typedef std::vector<std::pair<RawIntegral, std::vector<umod64>>> IBPProtoFF;
 
 class Sector {
 public:
@@ -133,15 +139,14 @@ public:
   // generate seeds and read targets
   void prepare_targets(const std::vector<RawIntegral> &);
   // run the reduction
-  void run_reduce(const std::vector<IBPProto> &, const std::vector<GiNaC::symbol> &);
+  void run_reduce(const std::vector<IBPProtoFF> &);
 
 private:
   // generate seeds satisfying the depth and rank
   void _generate_seeds();
 
   // generate an equation which contains a certain integral
-  void _generate_equation(unsigned, const std::vector<IBPProto> &,
-                          const std::vector<GiNaC::symbol> &);
+  void _generate_equation(unsigned, const std::vector<IBPProtoFF> &);
 
 public:
   // dp of combinations
@@ -183,7 +188,7 @@ private:
   // second: number of ibp
   std::set<std::pair<unsigned, unsigned>> _usedIBP;
   // the ibp system
-  std::vector<std::map<unsigned, GiNaC::ex, std::greater<>>> _system;
+  std::vector<EquationFF> _systemFF;
   // line number of each pivot
   std::unordered_map<unsigned, unsigned> _lineNumber;
 };
