@@ -139,7 +139,11 @@ public:
   // generate seeds and read targets
   void prepare_targets(const std::vector<RawIntegral> &);
   // run the reduction
-  void run_reduce(const std::vector<IBPProtoFF> &);
+  unsigned run_reduce(const std::vector<IBPProtoFF> &);
+  // run sector reduction
+  unsigned sector_reduction(const std::vector<IBPProtoFF> &);
+  // run block reduction
+  unsigned block_reduce(unsigned depth, unsigned rank, const std::vector<IBPProtoFF> &);
 
 private:
   // generate seeds satisfying the depth and rank
@@ -189,6 +193,7 @@ private:
   std::set<std::pair<unsigned, unsigned>> _usedIBP;
   // the ibp system
   std::vector<EquationFF> _systemFF;
+  std::vector<EquationFF> _gaussFF;
   // line number of each pivot
   std::unordered_map<unsigned, unsigned> _lineNumber;
 };

@@ -4,6 +4,7 @@
 #include "yaml-cpp/yaml.h"
 
 #include "inibp.h"
+#include <flint/nmod_vec.h>
 
 
 int main(int argc, char **argv) {

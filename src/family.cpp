@@ -1,4 +1,5 @@
 #include "family.h"
+#include "BS_thread_pool.hpp"
 
 GiNaC::symtab Family::symtab;
 
@@ -143,7 +144,17 @@ void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
 }
 
 void Family::run_reduce(Reduce &reduce) const {
-  reduce._reduceSectors[0].run_reduce(_ibpFF);
+  BS::thread_pool pool;
+
+  clock_t start = clock();
+
+  //unsigned equations = 0;
+  for (auto& sector: reduce._reduceSectors)
+    pool.push_task(&Sector::run_reduce, sector, _ibpFF);
+  pool.wait_for_tasks();
+
+  clock_t end = clock();
+  //std::cout << "\n  equations: " << equations << std::endl;
 }
 
 void Family::print() const {
@@ -534,12 +545,21 @@ void Reduce::prepare_sectors() {
       return false;
   });
 
+  unsigned depth = std::popcount(_top) + 1;
+  unsigned rank = 1;
+  for (const auto &integral: _rawTargets) {
+    depth = std::max(depth, integral.depth() + 1);
+    rank = std::max(rank, integral.rank() + 1);
+  }
+
   // fill the reduce sectors
   _reduceSectors = std::vector<Sector>(nsec);
   for (unsigned i = 0; i < sectors.size(); ++i) {
     _reduceSectors[i]._id = sectors[i];
     _reduceSectors[i]._nprops = _nprops;
     _reduceSectors[i]._lines = std::vector<bool>(_nprops, false);
+    _reduceSectors[i]._depth = depth;
+    _reduceSectors[i]._rank = rank;
     for (unsigned j = 0; j < _nprops; ++j) {
       if (sectors[i] & (1 << j))
         _reduceSectors[i]._lines[j] = true;
@@ -548,14 +568,6 @@ void Reduce::prepare_sectors() {
       if ((sectors[i] & (1 << j)) == 0 && _lines[j])
         _reduceSectors[i]._superSectors.push_back(sectors[i] | (1 << j));
     }
+    _reduceSectors[i].prepare_targets(_rawTargets);
   }
-
-  // prepare the top sector
-  _reduceSectors[0]._depth = std::popcount(_top) + 1;
-  _reduceSectors[0]._rank = 1;
-  for (const auto &integral: _rawTargets) {
-    _reduceSectors[0]._depth = std::max(_reduceSectors[0]._depth, integral.depth() + 1);
-    _reduceSectors[0]._rank = std::max(_reduceSectors[0]._rank, integral.rank() + 1);
-  }
-  _reduceSectors[0].prepare_targets(_rawTargets);
 }
