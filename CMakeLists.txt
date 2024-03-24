@@ -42,3 +42,10 @@ if (NOT GINAC_LIBRARY)
     message(FATAL_ERROR "ginac library not found")
 endif ()
 target_link_libraries(inibp ${GINAC_LIBRARY})
+
+#finiteflow library
+find_library(FFLOW_LIBRARY NAMES fflow)
+if (NOT FFLOW_LIBRARY)
+    message(FATAL_ERROR "finiteflow library not found")
+endif ()
+target_link_libraries(inibp ${FFLOW_LIBRARY})

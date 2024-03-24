@@ -112,6 +112,9 @@ void Family::init() {
 }
 
 void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
+  reduce._symbols = _symbols;
+  reduce._symIndices = _symIndices;
+
   std::cout << "\n \033[33m#0.3\033[0m   Collecting target integrals...\n";
   if (!config["targets"])
     throw std::runtime_error("reduce targets not found");
@@ -144,17 +147,12 @@ void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
 }
 
 void Family::run_reduce(Reduce &reduce) const {
-  BS::thread_pool pool;
+  BS::thread_pool pool(1);
 
-  clock_t start = clock();
-
-  //unsigned equations = 0;
   for (auto& sector: reduce._reduceSectors)
-    pool.push_task(&Sector::run_reduce, sector, _ibpFF);
+    pool.push_task(&Sector::run_reduce_sym, sector, _ibp);
+    //pool.push_task(&Sector::run_reduce, sector, _ibpFF);
   pool.wait_for_tasks();
-
-  clock_t end = clock();
-  //std::cout << "\n  equations: " << equations << std::endl;
 }
 
 void Family::print() const {
@@ -515,7 +513,7 @@ void Reduce::print() const {
               return value;
             });
 
-  std::cout << std::endl;
+  std::cout << "\n" << std::endl;
 }
 
 void Reduce::prepare_sectors() {
@@ -523,6 +521,12 @@ void Reduce::prepare_sectors() {
   for (unsigned i = 0; i < _nprops; ++i)
     if (_top & (1 << i))
       _lines[i] = true;
+
+//  unsigned cut = (1<<0) + (1<<1) + (1<<2);
+//  for(unsigned i = 0; i < _sectors.size(); ++i) {
+//    if ((cut & i) != cut)
+//      _sectors[i] = false;
+//  }
 
   unsigned nsec = std::count_if(_sectors.begin(), _sectors.end(), [](bool value) {
     return value;
@@ -560,6 +564,8 @@ void Reduce::prepare_sectors() {
     _reduceSectors[i]._lines = std::vector<bool>(_nprops, false);
     _reduceSectors[i]._depth = depth;
     _reduceSectors[i]._rank = rank;
+    _reduceSectors[i]._symbols = _symbols;
+    _reduceSectors[i]._symIndices = _symIndices;
     for (unsigned j = 0; j < _nprops; ++j) {
       if (sectors[i] & (1 << j))
         _reduceSectors[i]._lines[j] = true;

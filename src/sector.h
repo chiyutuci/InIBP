@@ -5,10 +5,13 @@
 #include <queue>
 #include <unordered_map>
 #include <numeric>
+#include <algorithm>
 
 #include "yaml-cpp/yaml.h"
 #include "ginac/ginac.h"
 #include "arith/umod.h"
+
+#include "fflow/graph.hh"
 
 #include "utils.h"
 #include "equation.h"
@@ -140,17 +143,16 @@ public:
   void prepare_targets(const std::vector<RawIntegral> &);
   // run the reduction
   unsigned run_reduce(const std::vector<IBPProtoFF> &);
+  // run the symbolic reduction
+  unsigned run_reduce_sym(const std::vector<IBPProto> &);
   // run sector reduction
   unsigned sector_reduction(const std::vector<IBPProtoFF> &);
-  // run block reduction
-  unsigned block_reduce(unsigned depth, unsigned rank, const std::vector<IBPProtoFF> &);
+  // run symbolic reduction
+  unsigned sector_reduction_sym(const std::vector<IBPProto> &);
 
 private:
   // generate seeds satisfying the depth and rank
   void _generate_seeds();
-
-  // generate an equation which contains a certain integral
-  void _generate_equation(unsigned, const std::vector<IBPProtoFF> &);
 
 public:
   // dp of combinations
@@ -168,6 +170,10 @@ private:
   unsigned _depth = 0;
   // maximum rank
   unsigned _rank = 0;
+
+  // symbols
+  std::vector<GiNaC::possymbol> _symbols;
+  std::vector<GiNaC::symbol> _symIndices;
 
   // lines
   std::vector<bool> _lines;
@@ -194,6 +200,9 @@ private:
   // the ibp system
   std::vector<EquationFF> _systemFF;
   std::vector<EquationFF> _gaussFF;
+  // symbolic ibp system
+  std::vector<EquationSym> _systemS;
+  std::vector<EquationSym> _gaussS;
   // line number of each pivot
   std::unordered_map<unsigned, unsigned> _lineNumber;
 };

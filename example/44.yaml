@@ -1,15 +1,16 @@
 # family configuration
 family:
   # family name
-  name: fam2
+  name: fam4
   # loop momenta
-  internals: [ l1, l2, l3 ]
+  internals: [ l1, l2 ]
   # external momenta
-  externals: [ p1, p2 ]
+  externals: [ k1, k2, k3 ]
   # kinematics invariants
   # format: - [variable, dimension]
   invariants:
     - [ s, 2 ]
+    - [ t, 2 ]
     - [ m, 1 ]
   # [optional] the invariant set to one
   invar_one:
@@ -18,27 +19,25 @@ family:
   # format: - [momentum, mass]
   # mass must be contained in invariants and have dimension 1
   propagators:
-    - [ l3, 2*m ]
-    - [ l3-p1-p2, 2*m ]
-    - [ l2-l3/2, 0 ]
-    - [ l1, m ]
+    - [ l1, 0 ]
+    - [ l1+k1, 0 ]
+    - [ l1+k1/2-k2/2-k3/2, m ]
     - [ l2, m ]
-    - [ l2-p1/2-p2/2, m ]
-    - [ l1+l2, 0 ]
-    - [ l1+l3/2, 0 ]
-    - [ l3-p2, 0 ]
-    - [ l1+p1, 0 ]
-    - [ l2+p1, 0 ]
-    - [ l1+p2, 0 ]
+    - [ l2-k3/2, 0 ]
+    - [ l2-k1/2-k2/2, m ]
+    - [ l1+l2+k1/2-k2/2, m ]
+    - [ l1+l2+k1/2-k2/2-k3/2, 0 ]
+    - [ l2+k1, 0 ]
   # scalar products rules
   # format: - [momentum1, momentum2, expression]
   # symbols in expression must be contained in invariants
   sps_rules:
-    - [ p1, p1, 0 ]
-    - [ p2, p2, 0 ]
-    - [ p1, p2, s/2 ]
-
-
+    - [ k1, k1, 0 ]
+    - [ k2, k2, 0 ]
+    - [ k3, k3, 4*m^2]
+    - [ k1, k2, s/2 ]
+    - [ k1, k3, 2*m^2-t/2 ]
+    - [ k2, k3, s/2-2*m^2+t/2 ]
+    
 targets:
-  - [ 1, 1, 1, 2, -2, 0, 1, 2, 2, 0, 0, 0 ]
-  - [ 2, 1, 2, -1, 2, 2, 1, 2, -3, 0, -1, -1]
+  - [ 1, 1, 1, 1, 1, 1, 2, 2, -4]

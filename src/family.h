@@ -101,6 +101,9 @@ public:
   friend class Family;
 
 private:
+  // symbols
+  std::vector<GiNaC::possymbol> _symbols;
+  std::vector<GiNaC::symbol> _symIndices;
   // raw target integrals
   std::vector<RawIntegral> _rawTargets;
   // top sector

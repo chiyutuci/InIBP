@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "flint/fmpz.h"
+#include "flint/fmpq.h"
 #include "flint/nmod_vec.h"
 
 
@@ -53,15 +54,18 @@ public:
 
   // convert a string to a umod64
   static umod64 from(const std::string &s) {
-    fmpz_t num;
-    fmpz_init(num);
-    fmpz_set_str(num, s.c_str(), 10);
+    // the string may be a rational number
+    fmpq_t num;
+    fmpq_init(num);
+    fmpq_set_str(num, s.c_str(), 10);
 
-    umod64 res;
-    res._num = fmpz_get_nmod(num, MOD64);
+    umod64 numer, denom;
+    numer._num = fmpz_get_nmod(fmpq_numref(num), MOD64);
+    denom._num = fmpz_get_nmod(fmpq_denref(num), MOD64);
+    numer /= denom;
 
-    fmpz_clear(num);
-    return res;
+    fmpq_clear(num);
+    return numer;
   }
 
   // operators

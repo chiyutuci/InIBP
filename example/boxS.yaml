@@ -1,0 +1,24 @@
+family:
+  name: box
+  dimension: 3999/4000
+  internals: [ l1 ]
+  externals: [ p1, p2, p3 ]
+  invariants:
+  sps_rules:
+    - [ p1, p1, 1^2 ]
+    - [ p2, p2, 1^2 ]
+    - [ p3, p3, 1^2 ]
+    - [ p1, p2, 5/2-1^2 ]
+    - [ p1, p3, 3/2-1^2 ]
+    - [ p2, p3, -5/2-3/2-1^2 ]
+  propagators:
+    - [ l1, 1 ]
+    - [ l1+p1, 0 ]
+    - [ l1+p1+p2, 1 ]
+    - [ l1+p1+p2+p3, 0 ]
+
+targets:
+  - [ 2, 1, 1, 1 ]
+  - [ 1, 2, 1, 1 ]
+  - [ 1, 1, 2, 1 ]
+  - [ 1, 1, -1, 2 ]

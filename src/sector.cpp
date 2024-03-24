@@ -1,5 +1,6 @@
 #include "sector.h"
-#include <ctime>
+
+#include <fstream>
 
 std::map<std::pair<int, int>, std::vector<std::vector<int>>> Sector::combinations;
 
@@ -63,91 +64,16 @@ void Sector::_generate_seeds() {
     _weights[_seeds[i]] = i;
 }
 
-unsigned Sector::block_reduce(unsigned int depth, unsigned int rank,
-                          const std::vector<IBPProtoFF> &ibps) {
-  std::vector<RawIntegral> seeds;
-  std::vector<EquationFF> system;
-  std::unordered_map<unsigned,unsigned> lineNumber;
-
-  // generate all seeds within this block
-  int lines = std::popcount(_id);
-  int zeros = (int) _nprops - lines;
-  if (zeros!=0){
-    for (const auto &depthComb: combinations[{lines, depth-lines}])
-      for (const auto &rankComb: combinations[{zeros, rank}]) {
-        RawIntegral integral(_lines);
-        unsigned posLines = 0;
-        unsigned posZeros = 0;
-        for (unsigned i = 0; i < _nprops; i++) {
-          if (_lines[i])
-            integral[i] += depthComb[posLines++];
-          else
-            integral[i] -= rankComb[posZeros++];
-        }
-        seeds.emplace_back(std::move(integral));
-      }
-  }
-  else {
-    for (const auto &depthComb: combinations[{lines, depth-lines}]) {
-      RawIntegral integral(_lines);
-      unsigned posLines = 0;
-      for (unsigned i = 0; i < _nprops; i++)
-        if (_lines[i])
-          integral[i] += depthComb[posLines++];
-      seeds.emplace_back(std::move(integral));
-    }
-  }
-
-  for (const auto& seed: seeds) {
-    for (const auto & ibp : ibps) {
-      EquationFF equation;
-      //generate the ibp equation
-      for (const auto& item: ibp) {
-        RawIntegral integral = seed + item.first;
-        if (!_weights.contains(integral))
-          continue;
-        // check if coefficient is zero
-        umod64 coeff = item.second.back();
-        for (unsigned k = 0; k < _nprops; ++k)
-          if (item.second[k] != 0)
-            coeff += item.second[k] * umod64::from(seed[k]);
-        if (coeff == 0)
-          continue;
-        equation.insert(_weights[integral], coeff);
-      }
-      if (equation.empty())
-        continue;
-      else
-        equation.sort();
-
-      // Gauss elimination
-      while (!equation.empty() && lineNumber.contains(equation.first_integral())) {
-        equation.eliminate(system[lineNumber[equation.first_integral()]], 0);
-      }
-      if (equation.empty())
-        continue;
-      equation.normalize();
-      // add this equation to the system
-      lineNumber[equation.first_integral()] = system.size();
-      system.emplace_back(std::move(equation));
-    }
-  }
-
-  return system.size();
-}
-
 void Sector::prepare_targets(const std::vector<RawIntegral> &targets) {
   _generate_seeds();
 }
 
 unsigned Sector::run_reduce(const std::vector<IBPProtoFF> &ibps) {
-//  std::cout << "\n  sector: " << _id << "\n" << std::endl;
-//  unsigned equations = 0;
-//    for (unsigned depth = std::popcount(_id); depth < _depth; ++depth)
-//      for (unsigned rank = 0; rank < _rank; ++rank)
-//        equations += block_reduce(depth, rank, ibps);
-//  return equations;
   return sector_reduction(ibps);
+}
+
+unsigned Sector::run_reduce_sym(const std::vector<IBPProto> &ibps) {
+  return sector_reduction_sym(ibps);
 }
 
 unsigned Sector::sector_reduction(const std::vector<IBPProtoFF> & ibps) {
@@ -205,88 +131,99 @@ unsigned Sector::sector_reduction(const std::vector<IBPProtoFF> & ibps) {
   for (unsigned i = 0; i < _seeds.size(); ++i) {
     if (_seeds[i].depth() < _depth && _seeds[i].rank() < _rank) {
       if (!_lineNumber.contains(i))
-        std::cout << "      " << _seeds[i] << std::endl;
+        std::cout << "      " << _seeds[i] << "  # " << _id << std::endl;
     }
   }
 
-  return _gaussFF.size();
+  _systemFF.clear();
+  _gaussFF.clear();
+  _seeds.clear();
+  _weights.clear();
+
+  return 1;
 }
 
-void Sector::_generate_equation(unsigned int target, const std::vector<IBPProtoFF> &ibps) {
-  RawIntegral integral(_seeds[target]);
-
-  for (unsigned i = 0; i < ibps.size(); ++i) {
-    for (const auto &item: ibps[i]) {
-      // check if the seed is in this sector
-      RawIntegral seed = integral - item.first;
-      if (seed.sector() != _id || !_weights.contains(seed))
-        continue;
-      // check if this ibp equation has been used
-      // if not used, mark it as used
-      if (_usedIBP.contains({_weights[seed], i + 1}))
-        continue;
-
-      // check if this item is non-zero
-      umod64 coe = item.second.back();
-      for (unsigned k = 0; k < _nprops; ++k)
-        if (item.second[k] != 0)
-          coe += item.second[k] * umod64::from(seed[k]);
-      if (coe == 0)
-        continue;
-
-      // compute the equation
-      EquationFF equation;
-      bool allInSeeds = true;
-      for (const auto &it: ibps[i]) {
-        RawIntegral integ = seed + it.first;
-        // check if the integral belongs to subsectors
-        if (integ.sector() != _id)
+unsigned Sector::sector_reduction_sym(const std::vector<IBPProto>& ibps) {
+  // generate the system
+  for (const auto& seed: _seeds) {
+    if (seed.depth() < _depth && seed.rank() < _rank) {
+      for (const auto &ibp: ibps) {
+        EquationSym equation;
+        //generate the ibp equation
+        for (const auto &item: ibp) {
+          RawIntegral integral = seed + item.first;
+          if (!_weights.contains(integral))
+            continue;
+          // check if coefficient is zero
+          GiNaC::lst values;
+          for (unsigned p = 0; p < _nprops; ++p)
+            values.append(_symIndices[p] == seed[p]);
+          GiNaC::ex coeff = item.second.subs(values).expand();
+          if (coeff == 0)
+            continue;
+          equation.insert(_weights[integral], coeff);
+        }
+        if (equation.empty())
           continue;
-        umod64 coeff = it.second.back();
-        for (unsigned k = 0; k < _nprops; ++k)
-          if (it.second[k] != 0)
-            coeff += it.second[k] * umod64::from(seed[k]);
-        if (coeff != 0) {
-          // check if the integral belongs to _seeds
-          if (_weights.contains(integ)) {
-            equation.insert(_weights[integ], coeff);
-          }
-          else {
-            allInSeeds = false;
-            break;
-          }
-        }
-      }
-      if (!allInSeeds || equation.empty()) {
-        _usedIBP.insert({_weights[seed], i + 1});
-        continue;
-      }
+        else
+          equation.sort();
 
-      // guass elimination
-      while (!equation.empty() && _lineNumber.contains(equation.first_integral())) {
-        equation.eliminate(_systemFF[_lineNumber[equation.first_integral()]],0);
+        _systemS.emplace_back(std::move(equation));
+        _systemS.back().eqnum = _systemS.size();
       }
-      if (equation.empty()) {
-        _usedIBP.insert({_weights[seed], i + 1});
-        continue;
-      }
-
-      equation.normalize();
-
-      // record auxiliary targets
-      for (const auto &term: equation.eq())
-        if (!_usedTargets.contains(term.first)) {
-          _auxTargets.push(term.first);
-          _usedTargets.insert(term.first);
-        }
-
-      // add the equation to the system
-      _lineNumber[equation.first_integral()] = _systemFF.size();
-      _systemFF.emplace_back(std::move(equation));
-      _usedIBP.insert({_weights[seed], i + 1});
-      // goto NextTarget;
     }
   }
-  NextTarget:
-  _auxTargets.pop();
+  std::sort(_systemS.begin(), _systemS.end());
+
+  // gauss elimination
+  for (auto& equation : _systemS) {
+    while (!equation.empty() && _lineNumber.contains(equation[0])) {
+      equation.eliminate(_gaussS[_lineNumber[equation[0]]], 0);
+    }
+    if (equation.empty())
+      continue;
+    equation.normalize();
+
+    for (unsigned i = 1; i < equation.size();) {
+      if (_lineNumber.contains(equation[i]))
+        equation.eliminate(_gaussS[_lineNumber[equation[i]]], i);
+      else
+        ++i;
+    }
+
+    _lineNumber[equation.first_integral()] = _gaussS.size();
+    _gaussS.emplace_back(std::move(equation));
+  }
+
+  for (unsigned i = 0; i < _seeds.size(); ++i) {
+    if (_seeds[i].depth() < _depth && _seeds[i].rank() < _rank) {
+      if (!_lineNumber.contains(i))
+        std::cout << "      " << _seeds[i] << "  # " << _id << std::endl;
+    }
+  }
+
+  std::string path = "result_" + std::to_string(_id);
+  std::ofstream file(path);
+
+  for(const auto& item: _lineNumber) {
+    file << _seeds[item.first] << std::endl;
+    unsigned num = _gaussS[item.second].size();
+    if (num > 1) {
+      for (unsigned i = 1; i < num - 1; ++i)
+        file << "(" << -_gaussS[item.second].coeff(i) << ")*" << _seeds[_gaussS[item.second][i]] <<
+             "+";
+      file << "(" << -_gaussS[item.second].coeff(num - 1) << ")*"
+           << _seeds[_gaussS[item.second][num - 1]];
+      file << "\n" << std::endl;
+    }
+    else
+      file << "0\n" << std::endl;
+  }
+
+  _systemS.clear();
+  _gaussS.clear();
+  _seeds.clear();
+  _weights.clear();
+
+  return 1;
 }
