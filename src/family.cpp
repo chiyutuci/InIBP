@@ -169,10 +169,12 @@ void Family::init_reduce(const YAML::Node &config, Reduce &reduce) const {
 void Family::run_reduce(Reduce &reduce) const {
   BS::thread_pool pool(1);
 
-  for (auto &sector : reduce._reduceSectors)
-    pool.push_task(&Sector::run_reduce_sym, sector, _ibp);
-  // pool.push_task(&Sector::run_reduce, sector, _ibpFF);
+  for (auto &sector : reduce._reduceSectors) {
+    // if (sector.id() == 2887)
+    pool.push_task(&Sector::run_reduce_ff, sector, _ibp);
+  }
   pool.wait_for_tasks();
+  // pool.push_task(&Sector::run_reduce, sector, _ibpFF);
 }
 
 void Family::print() const {
@@ -566,11 +568,11 @@ void Reduce::prepare_sectors() {
     if (_top & (1 << i))
       _lines[i] = true;
 
-  //  unsigned cut = (1<<0) + (1<<1) + (1<<2);
-  //  for(unsigned i = 0; i < _sectors.size(); ++i) {
-  //    if ((cut & i) != cut)
-  //      _sectors[i] = false;
-  //  }
+  unsigned cut = (1 << 0) + (1 << 1) + (1 << 2);
+  for (unsigned i = 0; i < _sectors.size(); ++i) {
+    if ((cut & i) != cut)
+      _sectors[i] = false;
+  }
   unsigned topSect = 0;
   for (auto sector : _targetSectors)
     topSect = std::max(topSect, sector);
@@ -624,6 +626,5 @@ void Reduce::prepare_sectors() {
       if ((sectors[i] & (1 << j)) == 0 && _lines[j])
         _reduceSectors[i]._superSectors.push_back(sectors[i] | (1 << j));
     }
-    _reduceSectors[i].prepare_targets(_rawTargets);
   }
 }

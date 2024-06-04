@@ -1,20 +1,20 @@
 #pragma once
 
+#include <algorithm>
 #include <iostream>
-#include <vector>
+#include <numeric>
 #include <queue>
 #include <unordered_map>
-#include <numeric>
-#include <algorithm>
+#include <vector>
 
-#include "yaml-cpp/yaml.h"
-#include "ginac/ginac.h"
 #include "arith/umod.h"
+#include "ginac/ginac.h"
+#include "yaml-cpp/yaml.h"
 
 #include "fflow/graph.hh"
 
-#include "utils.h"
 #include "equation.h"
+#include "utils.h"
 
 class Reduce;
 
@@ -44,16 +44,14 @@ public:
 
   // sum of positive indices
   [[nodiscard]] unsigned depth() const {
-    return std::accumulate(indices.begin(), indices.end(), 0, [](int a, int b) {
-      return b > 0 ? a + b : a;
-    });
+    return std::accumulate(indices.begin(), indices.end(), 0,
+                           [](int a, int b) { return b > 0 ? a + b : a; });
   }
 
   // sum of negative indices
   [[nodiscard]] unsigned rank() const {
-    return std::accumulate(indices.begin(), indices.end(), 0, [](int a, int b) {
-      return b < 0 ? a - b : a;
-    });
+    return std::accumulate(indices.begin(), indices.end(), 0,
+                           [](int a, int b) { return b < 0 ? a - b : a; });
   }
 
   // sector of the integral
@@ -91,7 +89,8 @@ public:
     return integral;
   }
 
-  friend std::ostream &operator<<(std::ostream &os, const RawIntegral &integral) {
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const RawIntegral &integral) {
     os << integral.indices;
     return os;
   }
@@ -103,28 +102,26 @@ private:
 };
 
 namespace std {
-  template<>
-  struct hash<RawIntegral> {
-    std::size_t operator()(const RawIntegral &integral) const {
-      std::size_t hash = integral.size();
-      for (auto i: integral.indices)
-        hash ^= i + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-      return hash;
-    }
-  };
-}
+template <> struct hash<RawIntegral> {
+  std::size_t operator()(const RawIntegral &integral) const {
+    std::size_t hash = integral.size();
+    for (auto i : integral.indices)
+      hash ^= i + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    return hash;
+  }
+};
+} // namespace std
 
 namespace YAML {
-  template<>
-  struct convert<RawIntegral> {
-    static bool decode(const Node &node, RawIntegral &integral) {
-      if (!node.IsSequence())
-        return false;
-      integral = RawIntegral(node.as<std::vector<int>>());
-      return true;
-    }
-  };
-}
+template <> struct convert<RawIntegral> {
+  static bool decode(const Node &node, RawIntegral &integral) {
+    if (!node.IsSequence())
+      return false;
+    integral = RawIntegral(node.as<std::vector<int>>());
+    return true;
+  }
+};
+} // namespace YAML
 
 // ibp relation
 // first:  integral indices
@@ -145,10 +142,16 @@ public:
   unsigned run_reduce(const std::vector<IBPProtoFF> &);
   // run the symbolic reduction
   unsigned run_reduce_sym(const std::vector<IBPProto> &);
+  // run the finiteflow reduction
+  unsigned run_reduce_ff(const std::vector<IBPProto> &);
   // run sector reduction
   unsigned sector_reduction(const std::vector<IBPProtoFF> &);
   // run symbolic reduction
   unsigned sector_reduction_sym(const std::vector<IBPProto> &);
+  // run finiteflow reduction
+  unsigned sector_reduction_ff(const std::vector<IBPProto> &);
+
+  unsigned id() const { return _id; }
 
 private:
   // generate seeds satisfying the depth and rank
@@ -157,7 +160,8 @@ private:
 public:
   // dp of combinations
   // combinations[<number, sum>] -> [combinations]
-  static std::map<std::pair<int, int>, std::vector<std::vector<int>>> combinations;
+  static std::map<std::pair<int, int>, std::vector<std::vector<int>>>
+      combinations;
   // fill the combinations up to <number, sum>
   static void generate_combinations(int number, int sum);
 
@@ -201,7 +205,8 @@ private:
   std::vector<EquationFF> _systemFF;
   std::vector<EquationFF> _gaussFF;
   // symbolic ibp system
-  std::vector<EquationSym> _systemS;
+  std::vector<EquationSym> _systemS1;
+  std::vector<EquationSym> _systemS2;
   std::vector<EquationSym> _gaussS;
   // line number of each pivot
   std::unordered_map<unsigned, unsigned> _lineNumber;

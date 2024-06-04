@@ -1,12 +1,10 @@
 #pragma once
 
-#include <fstream>
 #include <iostream>
 
 #include <yaml-cpp/yaml.h>
 
 #include "family.h"
-
 
 class InIBP {
 public:
