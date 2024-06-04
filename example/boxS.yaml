@@ -1,6 +1,6 @@
 family:
   name: box
-  dimension: 3999/4000
+  dimension: 1999/500
   internals: [ l1 ]
   externals: [ p1, p2, p3 ]
   invariants:
@@ -22,3 +22,5 @@ targets:
   - [ 1, 2, 1, 1 ]
   - [ 1, 1, 2, 1 ]
   - [ 1, 1, -1, 2 ]
+  
+progress: 1

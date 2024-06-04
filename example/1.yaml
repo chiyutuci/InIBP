@@ -2,6 +2,8 @@
 family:
   # family name
   name: fam1
+  # numeric dimension
+  dimension: 399/100
   # loop momenta
   internals: [ l1, l2, l3, l4 ]
   # external momenta
@@ -35,8 +37,14 @@ family:
   # symbols in expression must be contained in invariants
   sps_rules:
     - [ p, p, 4 ]
+
+  # cut
+  cut: [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     
 targets:
   - [ 1, 1, 1, -3, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0 ]
   - [ 1, 1, 1, -2, 1, 0, 0, 1, 1, 1, 1, 2, 1, 0 ]
   - [ 1, 1, 1, 1, -3, 0, 0, 1, 1, 1, 1, 1, 1, 0 ]
+  - [ 1, 1, 1, 1, -2, 0, 0, 1, 1, 1, 1, 0, 1, 0 ]
+ 
+progress: 1

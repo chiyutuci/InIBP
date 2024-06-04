@@ -1,0 +1,43 @@
+# family configuration
+family:
+  # family name
+  name: topoA
+  # loop momenta
+  internals: [ l1, l2 ]
+  # external momenta
+  externals: [ k1, k2, p1 ]
+  # kinematics invariants
+  # format: - [variable, dimension]
+  invariants:
+    - [ s, 2 ]
+    - [ t, 2 ]
+    - [ m, 1 ]
+  # [optional] the invariant set to one
+  invar_one:
+
+  # propagators
+  # format: - [momentum, mass]
+  # mass must be contained in invariants and have dimension 1
+  propagators:
+    - [ l1, m ]
+    - [ l1+p1/2, 0 ]
+    - [ l1+k1/2+k2/2, m ]
+    - [ l2, 0 ]
+    - [ l2-k2, 0 ]
+    - [ l2+k1-p1/2, m ]
+    - [ l1+l2+k1-p1/2, 0 ]
+    - [ l1+l2+k1/2-k2/2, m ]
+    - [ l1+k1, 0 ]
+  # scalar products rules
+  # format: - [momentum1, momentum2, expression]
+  # symbols in expression must be contained in invariants
+  sps_rules:
+    - [ k1, k1, 0 ]
+    - [ k2, k2, 0 ]
+    - [ p1, p1, 4*m^2]
+    - [ k1, k2, s/2 ]
+    - [ k1, p1, 2*m^2-t/2 ]
+    - [ k2, p1, s/2-2*m^2+t/2 ]
+    
+targets:
+  - [ 1, 1, 1, 1, 1, 1, 2, 2, -4]

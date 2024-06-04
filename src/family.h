@@ -106,6 +106,8 @@ private:
   std::vector<GiNaC::symbol> _symIndices;
   // raw target integrals
   std::vector<RawIntegral> _rawTargets;
+  std::set<unsigned> _targetSectors;
+  std::vector<unsigned > _targetSectorsSort;
   // top sector
   unsigned _top = 0;
   // number of propagators

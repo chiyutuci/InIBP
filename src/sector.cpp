@@ -2,7 +2,8 @@
 
 #include <fstream>
 
-std::map<std::pair<int, int>, std::vector<std::vector<int>>> Sector::combinations;
+std::map<std::pair<int, int>, std::vector<std::vector<int>>>
+    Sector::combinations;
 
 void Sector::generate_combinations(int number, int sum) {
   for (int num = 0; num <= number; ++num)
@@ -17,7 +18,7 @@ void Sector::generate_combinations(int number, int sum) {
         combinations[{num, s}] = {std::vector<int>(num, 0)};
       else
         for (int i = 0; i <= s; ++i) {
-          for (const auto &comb: combinations[{num - 1, s - i}]) {
+          for (const auto &comb : combinations[{num - 1, s - i}]) {
             std::vector<int> newComb = comb;
             newComb.emplace_back(i);
             combinations[{num, s}].emplace_back(std::move(newComb));
@@ -28,16 +29,16 @@ void Sector::generate_combinations(int number, int sum) {
 
 void Sector::_generate_seeds() {
   int lines = std::popcount(_id);
-  int zeros = (int) _nprops - lines;
+  int zeros = (int)_nprops - lines;
   int number = std::max(lines, zeros);
-  int sum = std::max((int) _depth - std::popcount(_id), (int) _rank);
+  int sum = std::max((int)_depth - std::popcount(_id), (int)_rank);
   generate_combinations(number, sum);
 
   for (int depth = 0; depth <= _depth - std::popcount(_id); ++depth) {
     if (zeros != 0)
       for (int rank = 0; rank <= _rank; ++rank)
-        for (const auto &depthComb: combinations[{lines, depth}])
-          for (const auto &rankComb: combinations[{zeros, rank}]) {
+        for (const auto &depthComb : combinations[{lines, depth}])
+          for (const auto &rankComb : combinations[{zeros, rank}]) {
             RawIntegral integral(_lines);
             unsigned posLines = 0;
             unsigned posZeros = 0;
@@ -50,7 +51,7 @@ void Sector::_generate_seeds() {
             _seeds.emplace_back(std::move(integral));
           }
     else {
-      for (const auto &depthComb: combinations[{lines, depth}]) {
+      for (const auto &depthComb : combinations[{lines, depth}]) {
         RawIntegral integral(_lines);
         unsigned posLines = 0;
         for (unsigned i = 0; i < _nprops; i++)
@@ -76,14 +77,14 @@ unsigned Sector::run_reduce_sym(const std::vector<IBPProto> &ibps) {
   return sector_reduction_sym(ibps);
 }
 
-unsigned Sector::sector_reduction(const std::vector<IBPProtoFF> & ibps) {
+unsigned Sector::sector_reduction(const std::vector<IBPProtoFF> &ibps) {
   // generate the system
-  for (const auto& seed: _seeds) {
+  for (const auto &seed : _seeds) {
     if (seed.depth() < _depth && seed.rank() < _rank) {
-      for (const auto &ibp: ibps) {
+      for (const auto &ibp : ibps) {
         EquationFF equation;
-        //generate the ibp equation
-        for (const auto &item: ibp) {
+        // generate the ibp equation
+        for (const auto &item : ibp) {
           RawIntegral integral = seed + item.first;
           if (!_weights.contains(integral))
             continue;
@@ -109,7 +110,7 @@ unsigned Sector::sector_reduction(const std::vector<IBPProtoFF> & ibps) {
   std::sort(_systemFF.begin(), _systemFF.end());
 
   // gauss elimination
-  for (auto& equation : _systemFF) {
+  for (auto &equation : _systemFF) {
     while (!equation.empty() && _lineNumber.contains(equation[0])) {
       equation.eliminate(_gaussFF[_lineNumber[equation[0]]], 0);
     }
@@ -143,14 +144,14 @@ unsigned Sector::sector_reduction(const std::vector<IBPProtoFF> & ibps) {
   return 1;
 }
 
-unsigned Sector::sector_reduction_sym(const std::vector<IBPProto>& ibps) {
+unsigned Sector::sector_reduction_sym(const std::vector<IBPProto> &ibps) {
   // generate the system
-  for (const auto& seed: _seeds) {
+  for (const auto &seed : _seeds) {
     if (seed.depth() < _depth && seed.rank() < _rank) {
-      for (const auto &ibp: ibps) {
+      for (const auto &ibp : ibps) {
         EquationSym equation;
-        //generate the ibp equation
-        for (const auto &item: ibp) {
+        // generate the ibp equation
+        for (const auto &item : ibp) {
           RawIntegral integral = seed + item.first;
           if (!_weights.contains(integral))
             continue;
@@ -175,24 +176,35 @@ unsigned Sector::sector_reduction_sym(const std::vector<IBPProto>& ibps) {
   }
   std::sort(_systemS.begin(), _systemS.end());
 
+  std::string recordPath = "record_" + std::to_string(_id);
+  std::ofstream record(recordPath);
+
   // gauss elimination
-  for (auto& equation : _systemS) {
+  for (auto &equation : _systemS) {
+    std::cout << equation.eqnum << std::endl;
     while (!equation.empty() && _lineNumber.contains(equation[0])) {
+      std::cout << _gaussS[_lineNumber[equation[0]]].eqnum << " ";
       equation.eliminate(_gaussS[_lineNumber[equation[0]]], 0);
     }
-    if (equation.empty())
+    if (equation.empty()) {
+      std::cout << "\n" << std::endl;
+
       continue;
+    }
     equation.normalize();
 
     for (unsigned i = 1; i < equation.size();) {
-      if (_lineNumber.contains(equation[i]))
+      if (_lineNumber.contains(equation[i])) {
+        std::cout << _gaussS[_lineNumber[equation[i]]].eqnum << " ";
         equation.eliminate(_gaussS[_lineNumber[equation[i]]], i);
-      else
+      } else
         ++i;
     }
 
     _lineNumber[equation.first_integral()] = _gaussS.size();
     _gaussS.emplace_back(std::move(equation));
+
+    std::cout << "\n" << std::endl;
   }
 
   for (unsigned i = 0; i < _seeds.size(); ++i) {
@@ -205,18 +217,17 @@ unsigned Sector::sector_reduction_sym(const std::vector<IBPProto>& ibps) {
   std::string path = "result_" + std::to_string(_id);
   std::ofstream file(path);
 
-  for(const auto& item: _lineNumber) {
+  for (const auto &item : _lineNumber) {
     file << _seeds[item.first] << std::endl;
     unsigned num = _gaussS[item.second].size();
     if (num > 1) {
       for (unsigned i = 1; i < num - 1; ++i)
-        file << "(" << -_gaussS[item.second].coeff(i) << ")*" << _seeds[_gaussS[item.second][i]] <<
-             "+";
+        file << "(" << -_gaussS[item.second].coeff(i) << ")*"
+             << _seeds[_gaussS[item.second][i]] << "+";
       file << "(" << -_gaussS[item.second].coeff(num - 1) << ")*"
            << _seeds[_gaussS[item.second][num - 1]];
       file << "\n" << std::endl;
-    }
-    else
+    } else
       file << "0\n" << std::endl;
   }
 
